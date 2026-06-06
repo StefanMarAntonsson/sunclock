@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24-Hour Analog Clock</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #0f1117;
+            font-family: 'Georgia', serif;
+        }
+
+        .clock-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* ── Digital readout ─────────────────────────────────── */
+        .time-display {
+            color: #94a3b8;
+            font-size: 1.2rem;
+            letter-spacing: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .sun-info {
+            color: #475569;
+            font-size: 0.78rem;
+            letter-spacing: 1.5px;
+            font-family: 'Courier New', monospace;
+            min-height: 1em;
+        }
+        .sun-info.live  { color: #fbbf24; }
+        .sun-info.error { color: #f87171; }
+
+        /* ── Shared control style ────────────────────────────── */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 500px;
+        }
+
+        .ctrl-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .ctrl-divider {
+            border: none;
+            border-top: 1px solid #1e2130;
+            margin: 2px 0;
+        }
+
+        .ctrl-label {
+            font-family: 'Courier New', monospace;
+            font-size: 0.7rem;
+            color: #374151;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        input[type="text"],
+        input[type="time"] {
+            background: #1a1f2e;
+            border: 1px solid #2d3748;
+            color: #cbd5e1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            padding: 5px 10px;
+            border-radius: 4px;
+            outline: none;
+            transition: border-color 0.15s;
+            color-scheme: dark;
+        }
+        input[type="text"]:focus,
+        input[type="time"]:focus { border-color: #475569; }
+        input[type="text"]::placeholder { color: #2d3748; }
+
+        input[type="color"] {
+            background: #1a1f2e;
+            border: 1px solid #2d3748;
+            border-radius: 4px;
+            width: 34px;
+            height: 31px;
+            padding: 3px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        button {
+            background: #1a1f2e;
+            border: 1px solid #2d3748;
+            color: #64748b;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+            padding: 5px 13px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s;
+            white-space: nowrap;
+        }
+        button:hover { border-color: #475569; color: #94a3b8; }
+
+        /* ── Location row ────────────────────────────────────── */
+        #locationInput { flex: 1; }
+
+        /* ── Range form ──────────────────────────────────────── */
+        #rangeLabel { flex: 1; min-width: 0; }
+        #rangeStart,
+        #rangeEnd   { width: 96px; flex-shrink: 0; }
+
+        .ctrl-sep {
+            color: #374151;
+            font-family: 'Courier New', monospace;
+            font-size: 0.82rem;
+        }
+
+        /* ── Range list ──────────────────────────────────────── */
+        #rangeList {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .range-item {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+
+        .range-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .range-name {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .range-times {
+            font-family: 'Courier New', monospace;
+            font-size: 0.78rem;
+            color: #475569;
+            flex-shrink: 0;
+        }
+
+        .range-del {
+            background: none;
+            border: none;
+            color: #2d3748;
+            font-size: 1rem;
+            padding: 0 2px;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .range-del:hover { color: #f87171; border: none; }
+    </style>
+</head>
+<body>
+    <div class="clock-container">
+        <canvas id="clock" width="660" height="660"></canvas>
+        <div class="time-display" id="timeDisplay"></div>
+        <div class="sun-info"    id="sunInfo">enter a location below</div>
+
+        <div class="controls">
+
+            <!-- Location -->
+            <div class="ctrl-row">
+                <input id="locationInput" type="text" placeholder="city or place…"
+                       autocomplete="off" spellcheck="false" />
+                <button id="locationBtn">set location</button>
+            </div>
+
+            <hr class="ctrl-divider" />
+            <span class="ctrl-label">custom ranges</span>
+
+            <!-- Add-range form -->
+            <div class="ctrl-row">
+                <input id="rangeLabel" type="text"  placeholder="label…" />
+                <input id="rangeStart" type="time"  value="08:00" />
+                <span  class="ctrl-sep">–</span>
+                <input id="rangeEnd"   type="time"  value="16:00" />
+                <input id="rangeColor" type="color" value="#22c55e" />
+                <button id="rangeAdd">add</button>
+            </div>
+
+            <!-- Range list -->
+            <div id="rangeList"></div>
+
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('clock');
+        const ctx    = canvas.getContext('2d');
+        const SIZE   = canvas.width;
+        const C      = SIZE / 2;   // 330
+        const R      = C - 28;     // 302
+
+        // Outer rim band (day / night)
+        const RIM_R = R - 12;   // 290  centre of band
+        const RIM_W = 16;       // spans 282–298
+
+        // Inner band (custom ranges)
+        const CUS_R = R - 35;   // 267  centre of band
+        const CUS_W = 12;       // spans 261–273
+
+        const LOC_KEY    = 'sunclock_location';
+        const RANGES_KEY = 'sunclock_ranges';
+
+        let sunriseH    = 6;
+        let sunsetH     = 20;
+        let customRanges = [];
+
+        // ── Angle helpers ────────────────────────────────────────────────────
+
+        // Noon at top; each hour = 15°.
+        function hourToAngle(h, m = 0, s = 0) {
+            const t = ((h - 12 + 24) % 24) + m / 60 + s / 3600;
+            return (t / 24) * 2 * Math.PI - Math.PI / 2;
+        }
+
+        function decimalToAngle(dh) {
+            const t = ((dh - 12) % 24 + 24) % 24;
+            return (t / 24) * 2 * Math.PI - Math.PI / 2;
+        }
+
+        function minuteToAngle(m, s = 0) {
+            return ((m + s / 60) / 60) * 2 * Math.PI - Math.PI / 2;
+        }
+
+        function secondToAngle(s) {
+            return (s / 60) * 2 * Math.PI - Math.PI / 2;
+        }
+
+        // ── Formatting ───────────────────────────────────────────────────────
+
+        function fmtHour(dh) {
+            let h = Math.floor(dh);
+            let m = Math.round((dh - h) * 60);
+            if (m === 60) { h++; m = 0; }
+            return `${String(h % 24).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+        }
+
+        function parseTime12h(str) {
+            const [time, period] = str.split(' ');
+            const [h, m, s] = time.split(':').map(Number);
+            let hours = h;
+            if (period === 'PM' && h !== 12) hours += 12;
+            if (period === 'AM' && h === 12) hours = 0;
+            return hours + m / 60 + s / 3600;
+        }
+
+        function parseTimeInput(val) {
+            if (!val) return null;
+            const [h, m] = val.split(':').map(Number);
+            return h + m / 60;
+        }
+
+        // ── APIs ─────────────────────────────────────────────────────────────
+
+        async function geocode(query) {
+            const url = `https://geocoding-api.open-meteo.com/v1/search` +
+                        `?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+            const res  = await fetch(url);
+            const data = await res.json();
+            if (!data.results?.length) throw new Error('No results');
+            const r = data.results[0];
+            return { lat: r.latitude, lng: r.longitude, timezone: r.timezone,
+                     label: `${r.name}, ${r.country}` };
+        }
+
+        async function fetchSunTimes(lat, lng, timezone) {
+            const day = new Date().toISOString().split('T')[0];
+            const url = `https://api.sunrisesunset.io/json` +
+                        `?lat=${lat}&lng=${lng}` +
+                        `&timezone=${encodeURIComponent(timezone)}&date=${day}`;
+            const res  = await fetch(url);
+            const data = await res.json();
+            if (data.status !== 'OK') throw new Error('Sun API error');
+            return { sunrise: parseTime12h(data.results.sunrise),
+                     sunset:  parseTime12h(data.results.sunset) };
+        }
+
+        // ── Persistence ──────────────────────────────────────────────────────
+
+        function saveLoc(record) { localStorage.setItem(LOC_KEY, JSON.stringify(record)); }
+        function loadLoc()       { try { return JSON.parse(localStorage.getItem(LOC_KEY)); } catch { return null; } }
+
+        function saveRanges()    { localStorage.setItem(RANGES_KEY, JSON.stringify(customRanges)); }
+        function loadRanges()    { try { return JSON.parse(localStorage.getItem(RANGES_KEY)) || []; } catch { return []; } }
+
+        // ── Info bar helpers ─────────────────────────────────────────────────
+
+        function setInfo(msg, cls = '') {
+            const el = document.getElementById('sunInfo');
+            el.className = 'sun-info' + (cls ? ' ' + cls : '');
+            el.textContent = msg;
+        }
+
+        // ── Location workflow ────────────────────────────────────────────────
+
+        async function applyLocation(query) {
+            setInfo('searching…');
+            try {
+                const loc   = await geocode(query);
+                const times = await fetchSunTimes(loc.lat, loc.lng, loc.timezone);
+                sunriseH = times.sunrise;
+                sunsetH  = times.sunset;
+                const today = new Date().toISOString().split('T')[0];
+                saveLoc({ ...loc, sunriseH, sunsetH, date: today });
+                document.getElementById('locationInput').value = loc.label;
+                setInfo(`${loc.label} · rise ${fmtHour(sunriseH)} · set ${fmtHour(sunsetH)}`, 'live');
+            } catch {
+                setInfo('location not found — check spelling and try again', 'error');
+            }
+        }
+
+        // ── Range management ─────────────────────────────────────────────────
+
+        function renderRangeList() {
+            const list = document.getElementById('rangeList');
+            list.innerHTML = '';
+            customRanges.forEach((r, i) => {
+                const item = document.createElement('div');
+                item.className = 'range-item';
+                item.innerHTML =
+                    `<div class="range-swatch" style="background:${r.color}"></div>` +
+                    `<span class="range-name">${r.label || 'Custom'}</span>` +
+                    `<span class="range-times">${fmtHour(r.startH)} – ${fmtHour(r.endH)}</span>` +
+                    `<button class="range-del" data-i="${i}" title="remove">×</button>`;
+                list.appendChild(item);
+            });
+            list.querySelectorAll('.range-del').forEach(btn =>
+                btn.addEventListener('click', () => {
+                    customRanges.splice(Number(btn.dataset.i), 1);
+                    saveRanges();
+                    renderRangeList();
+                })
+            );
+        }
+
+        function addRange() {
+            const startH = parseTimeInput(document.getElementById('rangeStart').value);
+            const endH   = parseTimeInput(document.getElementById('rangeEnd').value);
+            if (startH === null || endH === null) return;
+
+            customRanges.push({
+                id:     Date.now(),
+                label:  document.getElementById('rangeLabel').value.trim() || 'Custom',
+                startH,
+                endH,
+                color:  document.getElementById('rangeColor').value,
+            });
+            saveRanges();
+            renderRangeList();
+            document.getElementById('rangeLabel').value = '';
+        }
+
+        // ── Drawing ──────────────────────────────────────────────────────────
+
+        function drawHand(angle, length, width, color, hasTail = false) {
+            const tail = hasTail ? length * 0.2 : 0;
+            ctx.beginPath();
+            ctx.moveTo(C - tail * Math.cos(angle), C - tail * Math.sin(angle));
+            ctx.lineTo(C + length * Math.cos(angle), C + length * Math.sin(angle));
+            ctx.strokeStyle = color;
+            ctx.lineWidth   = width;
+            ctx.lineCap     = 'round';
+            ctx.stroke();
+        }
+
+        function drawClock() {
+            const now = new Date();
+            const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+
+            ctx.clearRect(0, 0, SIZE, SIZE);
+
+            const srA = decimalToAngle(sunriseH);
+            const ssA = decimalToAngle(sunsetH);
+
+            // ── Face ────────────────────────────────────────────────────────
+            ctx.beginPath();
+            ctx.arc(C, C, R, 0, 2 * Math.PI);
+            ctx.fillStyle = '#181e2e';
+            ctx.fill();
+
+            // Night tint (full circle)
+            ctx.beginPath();
+            ctx.arc(C, C, R, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(37, 99, 235, 0.09)';
+            ctx.fill();
+
+            // Day tint (pie sector, sunrise → sunset clockwise through noon)
+            ctx.beginPath();
+            ctx.moveTo(C, C);
+            ctx.arc(C, C, R, srA, ssA, false);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(251, 191, 36, 0.09)';
+            ctx.fill();
+
+            // ── Outer rim band — night then day ──────────────────────────────
+            ctx.beginPath();
+            ctx.arc(C, C, RIM_R, ssA, srA, false);
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.55)';
+            ctx.lineWidth   = RIM_W;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(C, C, RIM_R, srA, ssA, false);
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)';
+            ctx.lineWidth   = RIM_W;
+            ctx.stroke();
+
+            // ── Inner band — custom ranges ────────────────────────────────────
+            customRanges.forEach(r => {
+                const sA = decimalToAngle(r.startH);
+                const eA = decimalToAngle(r.endH);
+                // Skip if the two angles are identical (zero-length arc)
+                if (Math.abs(sA - eA) < 1e-9) return;
+                ctx.beginPath();
+                ctx.arc(C, C, CUS_R, sA, eA, false);
+                ctx.strokeStyle = r.color;
+                ctx.lineWidth   = CUS_W;
+                ctx.lineCap     = 'butt';
+                ctx.stroke();
+            });
+
+            // ── Outer border ─────────────────────────────────────────────────
+            ctx.beginPath();
+            ctx.arc(C, C, R, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#2d3748';
+            ctx.lineWidth   = 1.5;
+            ctx.stroke();
+
+            // ── Sunrise / sunset dots ─────────────────────────────────────────
+            [[srA, '#fde68a'], [ssA, '#f97316']].forEach(([angle, color]) => {
+                ctx.beginPath();
+                ctx.arc(C + RIM_R * Math.cos(angle), C + RIM_R * Math.sin(angle),
+                        5.5, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+            });
+
+            // ── Tick marks and all 24 labels ──────────────────────────────────
+            for (let i = 0; i < 24; i++) {
+                const angle   = hourToAngle(i);
+                const isMajor = i % 6 === 0;
+                const isMed   = i % 3 === 0;
+
+                const outer = R - 2;
+                const inner = isMajor ? R - 22 : isMed ? R - 14 : R - 8;
+
+                ctx.beginPath();
+                ctx.moveTo(C + outer * Math.cos(angle), C + outer * Math.sin(angle));
+                ctx.lineTo(C + inner * Math.cos(angle), C + inner * Math.sin(angle));
+                ctx.strokeStyle = isMajor ? '#f1f5f9' : isMed ? '#4b5563' : '#2d3748';
+                ctx.lineWidth   = isMajor ? 2.5 : 1.5;
+                ctx.stroke();
+
+                const lx = C + (R - 52) * Math.cos(angle);
+                const ly = C + (R - 52) * Math.sin(angle);
+                ctx.fillStyle    = isMajor ? '#f1f5f9' : isMed ? '#94a3b8' : '#475569';
+                ctx.font         = isMajor ? 'bold 15px Georgia' : '12px Georgia';
+                ctx.textAlign    = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(i.toString(), lx, ly);
+            }
+
+            // ── Hands ─────────────────────────────────────────────────────────
+            drawHand(hourToAngle(h, m, s), R * 0.50, 5.5, '#60a5fa');
+            drawHand(minuteToAngle(m, s),  R * 0.70, 3.5, '#cbd5e1');
+            drawHand(secondToAngle(s),     R * 0.80, 1.5, '#f87171', true);
+
+            // Centre cap
+            ctx.beginPath();
+            ctx.arc(C, C, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#f87171';
+            ctx.fill();
+
+            const pad = n => n.toString().padStart(2, '0');
+            document.getElementById('timeDisplay').textContent =
+                `${pad(h)}:${pad(m)}:${pad(s)}`;
+        }
+
+        // ── Init ─────────────────────────────────────────────────────────────
+
+        async function init() {
+            // Restore custom ranges
+            customRanges = loadRanges();
+            renderRangeList();
+
+            // Restore location
+            const saved = loadLoc();
+            if (saved) {
+                document.getElementById('locationInput').value = saved.label;
+                setInfo(`loading ${saved.label}…`);
+                const today = new Date().toISOString().split('T')[0];
+                try {
+                    if (saved.date === today && saved.sunriseH != null) {
+                        sunriseH = saved.sunriseH;
+                        sunsetH  = saved.sunsetH;
+                    } else {
+                        const times = await fetchSunTimes(saved.lat, saved.lng, saved.timezone);
+                        sunriseH = times.sunrise;
+                        sunsetH  = times.sunset;
+                        saveLoc({ ...saved, sunriseH, sunsetH, date: today });
+                    }
+                    setInfo(`${saved.label} · rise ${fmtHour(sunriseH)} · set ${fmtHour(sunsetH)}`, 'live');
+                } catch {
+                    if (saved.sunriseH != null) { sunriseH = saved.sunriseH; sunsetH = saved.sunsetH; }
+                    setInfo('could not refresh — showing cached sun times', 'error');
+                }
+            }
+
+            // Wire controls
+            const locBtn   = document.getElementById('locationBtn');
+            const locInput = document.getElementById('locationInput');
+            locBtn.addEventListener('click', () => {
+                if (locInput.value.trim()) applyLocation(locInput.value.trim());
+            });
+            locInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter' && locInput.value.trim()) applyLocation(locInput.value.trim());
+            });
+
+            document.getElementById('rangeAdd').addEventListener('click', addRange);
+            document.getElementById('rangeLabel').addEventListener('keydown', e => {
+                if (e.key === 'Enter') addRange();
+            });
+        }
+
+        drawClock();
+        setInterval(drawClock, 1000);
+        init();
+    </script>
+</body>
+</html>
