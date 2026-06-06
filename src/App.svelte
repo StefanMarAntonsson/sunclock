@@ -1,89 +1,83 @@
-<script>
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from './assets/vite.svg'
-  import heroImg from './assets/hero.png'
-  import Counter from './lib/Counter.svelte'
+<script lang="ts">
+  import Clock from './lib/Clock.svelte';
+  import LocationInput from './lib/LocationInput.svelte';
+  import RangeForm from './lib/RangeForm.svelte';
+  import RangeList from './lib/RangeList.svelte';
+  import { sunInfo } from './stores';
+
+  let timeStr = $state('00:00:00');
+
+  $effect(() => {
+    function tick() {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  });
 </script>
 
-<section id="center">
-  <div class="hero">
-    <img src={heroImg} class="base" width="170" height="179" alt="" />
-    <img src={svelteLogo} class="framework" alt="Svelte logo" />
-    <img src={viteLogo} class="vite" alt="Vite logo" />
+<div class="clock-container">
+  <Clock />
+  <div class="time-display">{timeStr}</div>
+  <div class="sun-info" class:live={$sunInfo.cls === 'live'} class:error={$sunInfo.cls === 'error'}>
+    {$sunInfo.msg}
   </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/App.svelte</code> and save to test <code>HMR</code></p>
-  </div>
-  <Counter />
-</section>
 
-<div class="ticks"></div>
-
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true">
-      <use href="/icons.svg#documentation-icon"></use>
-    </svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank" rel="noreferrer">
-          <img class="logo" src={viteLogo} alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://svelte.dev/" target="_blank" rel="noreferrer">
-          <img class="button-icon" src={svelteLogo} alt="" />
-          Learn more
-        </a>
-      </li>
-    </ul>
+  <div class="controls">
+    <LocationInput />
+    <hr class="ctrl-divider" />
+    <span class="ctrl-label">custom ranges</span>
+    <RangeForm />
+    <RangeList />
   </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true">
-      <use href="/icons.svg#social-icon"></use>
-    </svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li>
-        <a href="https://github.com/vitejs/vite" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#github-icon"></use>
-          </svg>
-          GitHub
-        </a>
-      </li>
-      <li>
-        <a href="https://chat.vite.dev/" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#discord-icon"></use>
-          </svg>
-          Discord
-        </a>
-      </li>
-      <li>
-        <a href="https://x.com/vite_js" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#x-icon"></use>
-          </svg>
-          X.com
-        </a>
-      </li>
-      <li>
-        <a href="https://bsky.app/profile/vite.dev" target="_blank" rel="noreferrer">
-          <svg class="button-icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#bluesky-icon"></use>
-          </svg>
-          Bluesky
-        </a>
-      </li>
-    </ul>
-  </div>
-</section>
+</div>
 
-<div class="ticks"></div>
-<section id="spacer"></section>
+<style>
+  .clock-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .time-display {
+    color: #94a3b8;
+    font-size: 1.2rem;
+    letter-spacing: 5px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .sun-info {
+    color: #475569;
+    font-size: 0.78rem;
+    letter-spacing: 1.5px;
+    font-family: 'Courier New', monospace;
+    min-height: 1em;
+  }
+  .sun-info.live  { color: #fbbf24; }
+  .sun-info.error { color: #f87171; }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 500px;
+  }
+
+  .ctrl-divider {
+    border: none;
+    border-top: 1px solid #1e2130;
+    margin: 2px 0;
+  }
+
+  .ctrl-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    color: #374151;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+</style>
