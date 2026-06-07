@@ -52,11 +52,17 @@
     return (s / 60) * 2 * Math.PI - Math.PI / 2;
   }
 
-  function drawWeatherRing(ctx: CanvasRenderingContext2D, cfg: ClockSettings) {
+  function drawWeatherRing(
+    ctx: CanvasRenderingContext2D,
+    cfg: ClockSettings,
+    sr: number,
+    ss: number,
+    tz: string,
+  ) {
     const codes = get(weatherCodes);
     if (!codes.length) return;
 
-    const periods = buildWeatherPeriods(codes);
+    const periods = buildWeatherPeriods(codes, sr, ss, tz);
     const ringInner = WX_R - WX_W / 2;
     const isFullCircle = (startH: number, endH: number) => startH === 0 && endH === 24;
 
@@ -193,8 +199,9 @@
     const ssA = decimalToAngle(ss);
 
     // Weather ring
-    if (cfg.showWeatherRing) {
-      drawWeatherRing(ctx, cfg);
+    const tz = get(locationTimezone);
+    if (cfg.showWeatherRing && tz !== null) {
+      drawWeatherRing(ctx, cfg, sr, ss, tz);
       if (cfg.showWeatherHand) drawRingHand(ctx, WX_R, WX_W, hourToAngle(h, m, s), cfg);
     }
 

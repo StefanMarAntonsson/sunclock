@@ -8,6 +8,17 @@ import {
   loadLoc,
   saveLoc,
 } from "../stores";
+
+const LOC_KEY = "sunclock_location";
+
+export function clearLocation() {
+  localStorage.removeItem(LOC_KEY);
+  locationTimezone.set(null);
+  sunriseH.set(6);
+  sunsetH.set(20);
+  weatherCodes.set([]);
+  sunInfo.set({ msg: "enter a location below", cls: "" });
+}
 import { geocode, fetchSunTimes, fetchWeather } from "./api";
 
 function fmtHour(dh: number): string {

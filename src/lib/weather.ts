@@ -1,5 +1,6 @@
 // Elemental colors — ordered dark→light for inner→outer stacking
 const SUN = "rgba(251, 191, 36, 0.85)";
+const NIGHT = "rgba(186, 230, 253, 0.22)"; // pale blue-silver for clear night
 const CLOUD = "rgba(148, 163, 184, 0.7)";
 const RAIN = "rgba(59, 130, 246, 0.8)";
 const SNOW = "rgba(186, 230, 253, 0.88)";
@@ -22,27 +23,48 @@ export interface WeatherPeriod {
   info: WeatherInfo;
 }
 
-export function wmoToInfo(code: number): WeatherInfo {
-  // ── Clear / cloudy ──────────────────────────────────────────────────
-  if (code === 0) return { emoji: "☀️", label: "Clear", layers: [[SUN, 1]] };
+export function wmoToInfo(code: number, night = false): WeatherInfo {
+  // ── Clear / cloudy — night variants swap SUN for NIGHT ───────────────
+  if (code === 0)
+    return night
+      ? { emoji: "🌙", label: "Clear night", layers: [[NIGHT, 1]] }
+      : { emoji: "☀️", label: "Clear", layers: [[SUN, 1]] };
   if (code === 1)
-    return {
-      emoji: "🌤️",
-      label: "Mainly clear",
-      layers: [
-        [CLOUD, 0.15],
-        [SUN, 0.85],
-      ],
-    };
+    return night
+      ? {
+          emoji: "🌙",
+          label: "Mainly clear",
+          layers: [
+            [CLOUD, 0.1],
+            [NIGHT, 0.9],
+          ],
+        }
+      : {
+          emoji: "🌤️",
+          label: "Mainly clear",
+          layers: [
+            [CLOUD, 0.15],
+            [SUN, 0.85],
+          ],
+        };
   if (code === 2)
-    return {
-      emoji: "⛅",
-      label: "Partly cloudy",
-      layers: [
-        [CLOUD, 0.5],
-        [SUN, 0.5],
-      ],
-    };
+    return night
+      ? {
+          emoji: "🌥️",
+          label: "Partly cloudy",
+          layers: [
+            [CLOUD, 0.5],
+            [NIGHT, 0.5],
+          ],
+        }
+      : {
+          emoji: "⛅",
+          label: "Partly cloudy",
+          layers: [
+            [CLOUD, 0.5],
+            [SUN, 0.5],
+          ],
+        };
   if (code === 3) return { emoji: "☁️", label: "Overcast", layers: [[CLOUD, 1]] };
 
   // ── Fog ─────────────────────────────────────────────────────────────
@@ -164,7 +186,7 @@ export function wmoToInfo(code: number): WeatherInfo {
       ],
     };
 
-  // ── Rain showers (sun breaks implied by "shower" nature) ────────────
+  // ── Rain showers ────────────────────────────────────────────────────
   if (code === 80)
     return {
       emoji: "🌦️",
@@ -217,7 +239,7 @@ export function wmoToInfo(code: number): WeatherInfo {
       ],
     };
 
-  // ── Thunderstorm (THUNDER outermost — the dramatic outer element) ────
+  // ── Thunderstorm ─────────────────────────────────────────────────────
   if (code === 95)
     return {
       emoji: "⛈️",
@@ -229,7 +251,6 @@ export function wmoToInfo(code: number): WeatherInfo {
       ],
     };
 
-  // 96, 99 — thunderstorm with hail
   return {
     emoji: "⛈️",
     label: "Thunderstorm + hail",
@@ -241,30 +262,71 @@ export function wmoToInfo(code: number): WeatherInfo {
   };
 }
 
-// Returns 24 weather periods for the next 24 rolling hours mapped to clock
-// positions 0-23. codes48: index 0-23 = today, 24-47 = tomorrow.
-export function buildWeatherPeriods(codes48: number[]): WeatherPeriod[] {
+function hourInTz(timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  return parseInt(parts.find((p) => p.type === "hour")?.value ?? "0");
+}
+
+function isNightHour(h: number, sunriseH: number, sunsetH: number): boolean {
+  return h < sunriseH || h >= sunsetH;
+}
+
+// Returns weather periods for the 24-hour clock face, split at sunrise/sunset
+// so day and night segments get the correct emojis and colors.
+export function buildWeatherPeriods(
+  codes48: number[],
+  sunriseH: number,
+  sunsetH: number,
+  timezone: string,
+): WeatherPeriod[] {
   if (!codes48.length) return [];
 
-  const currentHour = new Date().getHours();
+  const currentHour = hourInTz(timezone);
 
+  // Build rolling 24-h array: each index h = weather code for that clock hour
   const rolling: number[] = Array.from({ length: 24 }, (_, h) => {
     const dayOffset = h >= currentHour ? 0 : 1;
     return codes48[dayOffset * 24 + h] ?? 0;
   });
 
-  const periods: WeatherPeriod[] = [];
+  // Build initial periods by grouping consecutive identical codes
+  const raw: Array<{ startH: number; endH: number; code: number }> = [];
   let startH = 0;
   let code = rolling[0];
-
   for (let h = 1; h <= 24; h++) {
     const next = h < 24 ? rolling[h] : -1;
     if (next !== code) {
-      periods.push({ startH, endH: h, code, info: wmoToInfo(code) });
+      raw.push({ startH, endH: h, code });
       startH = h;
       code = next;
     }
   }
 
-  return periods;
+  // Split periods at sunrise and sunset boundaries so each segment is
+  // fully day or fully night — avoids a sunny band spanning after sunset
+  const boundaries = [Math.round(sunriseH), Math.round(sunsetH)];
+  const split: WeatherPeriod[] = [];
+  for (const p of raw) {
+    const cuts = [p.startH];
+    for (const b of boundaries) {
+      if (b > p.startH && b < p.endH) cuts.push(b);
+    }
+    cuts.push(p.endH);
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const midH = (cuts[i] + cuts[i + 1]) / 2;
+      const night = isNightHour(midH, sunriseH, sunsetH);
+      split.push({
+        startH: cuts[i],
+        endH: cuts[i + 1],
+        code: p.code,
+        info: wmoToInfo(p.code, night),
+      });
+    }
+  }
+
+  return split;
 }
