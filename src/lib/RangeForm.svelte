@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TimeRangePicker from './TimeRangePicker.svelte';
   import { customRanges } from '../stores';
 
   let label     = $state('');
@@ -31,9 +32,7 @@
 <div class="ctrl-row">
   <input class="range-label" type="text" placeholder="label…"
          bind:value={label} onkeydown={(e) => e.key === 'Enter' && add()} />
-  <input class="range-time" type="time" bind:value={startTime} />
-  <span class="ctrl-sep">–</span>
-  <input class="range-time" type="time" bind:value={endTime} />
+  <TimeRangePicker bind:startTime bind:endTime />
   <input type="color" bind:value={color} />
   <button onclick={add}>add</button>
 </div>
@@ -48,16 +47,5 @@
   .range-label {
     flex: 1;
     min-width: 0;
-  }
-
-  .range-time {
-    width: 96px;
-    flex-shrink: 0;
-  }
-
-  .ctrl-sep {
-    color: #374151;
-    font-family: 'Courier New', monospace;
-    font-size: 0.82rem;
   }
 </style>
