@@ -29,6 +29,26 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    max-height: 94px; /* ~3 items (28px each) + 2 gaps (5px each) */
+    overflow-y: auto;
+    padding-right: 16px; /* keeps × clear of scrollbar */
+  }
+
+  .range-list::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .range-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .range-list::-webkit-scrollbar-thumb {
+    background: #2d3748;
+    border-radius: 2px;
+  }
+
+  .range-list::-webkit-scrollbar-thumb:hover {
+    background: #475569;
   }
 
   .range-item {
@@ -66,9 +86,10 @@
     border: none !important;
     color: #2d3748;
     font-size: 1rem;
-    padding: 0 2px;
+    padding: 3px 8px;
     line-height: 1;
     cursor: pointer;
+    flex-shrink: 0;
   }
 
   .range-del:hover {
