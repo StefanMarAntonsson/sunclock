@@ -47,3 +47,17 @@ export async function fetchSunTimes(lat: number, lng: number, timezone: string):
     sunset: parseIsoTime(data.daily.sunset[0]),
   };
 }
+
+// Returns 48 WMO weather codes: index 0-23 = today, 24-47 = tomorrow.
+export async function fetchWeather(lat: number, lng: number, timezone: string): Promise<number[]> {
+  const url =
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${lat}&longitude=${lng}` +
+    `&hourly=weather_code` +
+    `&timezone=${encodeURIComponent(timezone)}` +
+    `&forecast_days=2`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.hourly?.weather_code) throw new Error("Weather data unavailable");
+  return data.hourly.weather_code as number[];
+}

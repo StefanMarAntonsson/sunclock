@@ -1,6 +1,6 @@
 import { get } from "svelte/store";
-import { sunriseH, sunsetH, sunInfo, loadLoc, saveLoc } from "../stores";
-import { geocode, fetchSunTimes } from "./api";
+import { sunriseH, sunsetH, sunInfo, weatherCodes, loadLoc, saveLoc } from "../stores";
+import { geocode, fetchSunTimes, fetchWeather } from "./api";
 
 function fmtHour(dh: number): string {
   let h = Math.floor(dh);
@@ -16,9 +16,13 @@ export async function applyLocation(query: string): Promise<string | null> {
   sunInfo.set({ msg: "searching…", cls: "" });
   try {
     const loc = await geocode(query);
-    const times = await fetchSunTimes(loc.lat, loc.lng, loc.timezone);
+    const [times, codes] = await Promise.all([
+      fetchSunTimes(loc.lat, loc.lng, loc.timezone),
+      fetchWeather(loc.lat, loc.lng, loc.timezone),
+    ]);
     sunriseH.set(times.sunrise);
     sunsetH.set(times.sunset);
+    weatherCodes.set(codes);
     saveLoc({
       ...loc,
       sunriseH: times.sunrise,
@@ -42,6 +46,11 @@ export async function loadSavedLocation(): Promise<string | null> {
 
   sunInfo.set({ msg: `loading ${saved.label}…`, cls: "" });
   const today = new Date().toISOString().split("T")[0];
+
+  // Weather is non-blocking — ring appears once the fetch resolves.
+  fetchWeather(saved.lat, saved.lng, saved.timezone)
+    .then((codes) => weatherCodes.set(codes))
+    .catch(() => {});
 
   try {
     if (saved.date === today && saved.sunriseH != null) {

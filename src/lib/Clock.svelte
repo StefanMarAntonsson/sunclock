@@ -1,15 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
-  import { sunriseH, sunsetH, customRanges } from '../stores';
+  import { sunriseH, sunsetH, customRanges, weatherCodes } from '../stores';
+  import { buildWeatherPeriods } from './weather';
 
-  const SIZE  = 660;
-  const C     = SIZE / 2;
-  const R     = C - 28;
-  const RIM_R = R - 12;
+  const SIZE  = 760;
+  const C     = SIZE / 2;   // 380
+  const R     = 302;        // clock face radius (same absolute size as before)
+  const RIM_R = R - 12;     // 290  day/night band centre
   const RIM_W = 16;
-  const CUS_R = R - 35;
+  const CUS_R = R - 35;     // 267  custom ranges band centre
   const CUS_W = 12;
+  const WX_R  = R + 24;     // 326  weather ring centre (outside clock face)
+  const WX_W  = 28;
 
   let canvas: HTMLCanvasElement = $state() as HTMLCanvasElement;
 
@@ -38,6 +41,40 @@
     ctx.stroke();
   }
 
+  function drawWeatherRing(ctx: CanvasRenderingContext2D) {
+    const codes = get(weatherCodes);
+    if (!codes.length) return;
+
+    const periods = buildWeatherPeriods(codes);
+
+    periods.forEach(({ startH, endH, info }) => {
+      const sA = decimalToAngle(startH);
+      const eA = decimalToAngle(endH); // endH=24 gives same angle as 0 (midnight)
+
+      ctx.beginPath();
+      // Full-circle guard: decimalToAngle(0) === decimalToAngle(24), so ctx.arc
+      // from sA to eA with sA===eA draws nothing — use 2π instead.
+      if (startH === 0 && endH === 24) {
+        ctx.arc(C, C, WX_R, 0, 2 * Math.PI);
+      } else {
+        ctx.arc(C, C, WX_R, sA, eA, false);
+      }
+      ctx.strokeStyle = info.color;
+      ctx.lineWidth   = WX_W;
+      ctx.lineCap     = 'butt';
+      ctx.stroke();
+
+      // Emoji at midpoint — only if group spans ≥2 hours (enough arc to fit text)
+      if (endH - startH >= 2) {
+        const midA = decimalToAngle((startH + endH) / 2);
+        ctx.font         = '15px sans-serif';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(info.emoji, C + WX_R * Math.cos(midA), C + WX_R * Math.sin(midA));
+      }
+    });
+  }
+
   function draw(ctx: CanvasRenderingContext2D) {
     const now    = new Date();
     const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
@@ -49,6 +86,9 @@
 
     const srA = decimalToAngle(sr);
     const ssA = decimalToAngle(ss);
+
+    // Weather ring (outermost, drawn first so clock sits on top)
+    drawWeatherRing(ctx);
 
     // Face
     ctx.beginPath();
@@ -154,11 +194,11 @@
   onMount(() => {
     const ctx = canvas.getContext('2d')!;
 
-    // Subscribe to store changes for immediate redraws; each subscribe also fires once now.
     const unsubs = [
       sunriseH.subscribe(() => draw(ctx)),
       sunsetH.subscribe(() => draw(ctx)),
       customRanges.subscribe(() => draw(ctx)),
+      weatherCodes.subscribe(() => draw(ctx)),
     ];
 
     const interval = setInterval(() => draw(ctx), 1000);

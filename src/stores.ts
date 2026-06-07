@@ -44,6 +44,7 @@ export function saveLoc(record: LocRecord) {
 export const sunriseH = writable<number>(6);
 export const sunsetH = writable<number>(20);
 export const customRanges = writable<Range[]>(loadRanges());
+export const weatherCodes = writable<number[]>([]);
 export const sunInfo = writable<{ msg: string; cls: string }>({
   msg: "enter a location below",
   cls: "",
