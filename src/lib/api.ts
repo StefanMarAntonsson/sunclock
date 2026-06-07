@@ -26,25 +26,24 @@ export async function geocode(query: string): Promise<GeoResult> {
   };
 }
 
-function parseTime12h(str: string): number {
-  const [time, period] = str.split(" ");
-  const [h, m, s] = time.split(":").map(Number);
-  let hours = h;
-  if (period === "PM" && h !== 12) hours += 12;
-  if (period === "AM" && h === 12) hours = 0;
-  return hours + m / 60 + s / 3600;
+function parseIsoTime(isoStr: string): number {
+  const [h, m] = isoStr.split("T")[1].split(":").map(Number);
+  return h + m / 60;
 }
 
 export async function fetchSunTimes(lat: number, lng: number, timezone: string): Promise<SunTimes> {
-  const day = new Date().toISOString().split("T")[0];
   const url =
-    `https://api.sunrisesunset.io/json` +
-    `?lat=${lat}&lng=${lng}&timezone=${encodeURIComponent(timezone)}&date=${day}`;
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${lat}&longitude=${lng}` +
+    `&daily=sunrise,sunset` +
+    `&timezone=${encodeURIComponent(timezone)}` +
+    `&forecast_days=1`;
   const res = await fetch(url);
   const data = await res.json();
-  if (data.status !== "OK") throw new Error("Sun API error");
+  if (!data.daily?.sunrise?.[0] || !data.daily?.sunset?.[0])
+    throw new Error("Sun data unavailable");
   return {
-    sunrise: parseTime12h(data.results.sunrise),
-    sunset: parseTime12h(data.results.sunset),
+    sunrise: parseIsoTime(data.daily.sunrise[0]),
+    sunset: parseIsoTime(data.daily.sunset[0]),
   };
 }
