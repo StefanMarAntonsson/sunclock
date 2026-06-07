@@ -3,21 +3,34 @@
   import LocationInput from './lib/LocationInput.svelte';
   import RangeForm from './lib/RangeForm.svelte';
   import RangeList from './lib/RangeList.svelte';
-  import { sunInfo } from './stores';
+  import SettingsPanel from './lib/SettingsPanel.svelte';
+  import { get } from 'svelte/store';
+  import { sunInfo, locationTimezone } from './stores';
 
   let timeStr = $state('00:00:00');
 
   $effect(() => {
     function tick() {
+      const tz = get(locationTimezone);
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
-      timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      if (tz) {
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+        }).formatToParts(now);
+        const v = (type: string) => parts.find(p => p.type === type)?.value ?? '00';
+        timeStr = `${v('hour')}:${v('minute')}:${v('second')}`;
+      } else {
+        timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      }
     }
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   });
 </script>
+
+<SettingsPanel />
 
 <div class="clock-container">
   <Clock />

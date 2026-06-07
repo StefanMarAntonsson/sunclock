@@ -1,5 +1,13 @@
 import { get } from "svelte/store";
-import { sunriseH, sunsetH, sunInfo, weatherCodes, loadLoc, saveLoc } from "../stores";
+import {
+  sunriseH,
+  sunsetH,
+  sunInfo,
+  weatherCodes,
+  locationTimezone,
+  loadLoc,
+  saveLoc,
+} from "../stores";
 import { geocode, fetchSunTimes, fetchWeather } from "./api";
 
 function fmtHour(dh: number): string {
@@ -23,6 +31,7 @@ export async function applyLocation(query: string): Promise<string | null> {
     sunriseH.set(times.sunrise);
     sunsetH.set(times.sunset);
     weatherCodes.set(codes);
+    locationTimezone.set(loc.timezone);
     saveLoc({
       ...loc,
       sunriseH: times.sunrise,
@@ -64,6 +73,7 @@ export async function loadSavedLocation(): Promise<string | null> {
     }
     const sr = get(sunriseH);
     const ss = get(sunsetH);
+    locationTimezone.set(saved.timezone);
     sunInfo.set({
       msg: `${saved.label} · rise ${fmtHour(sr)} · set ${fmtHour(ss)}`,
       cls: "live",
