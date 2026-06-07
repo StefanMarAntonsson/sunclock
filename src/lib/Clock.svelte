@@ -11,9 +11,9 @@
   const RIM_W = 16;
   const CUS_R = R - 35;     // 267  custom ranges band centre
   const CUS_W = 12;
-  const WX_R      = R + 24;           // 326  weather ring centre (outside clock face)
-  const WX_W      = 12;               // thinner ring
-  const WX_EMOJI_R = WX_R + WX_W / 2 + 16; // 348  emoji float outside ring edge
+  const WX_R       = R + 24;                   // 326  weather ring centre
+  const WX_W       = 20;                       // ring total width
+  const WX_EMOJI_R = WX_R + WX_W / 2 + 14;   // 350  emoji float just outside ring
 
   let canvas: HTMLCanvasElement = $state() as HTMLCanvasElement;
 
@@ -47,25 +47,33 @@
     if (!codes.length) return;
 
     const periods = buildWeatherPeriods(codes);
+    const ringInner = WX_R - WX_W / 2;
+    const isFullCircle = (startH: number, endH: number) => startH === 0 && endH === 24;
 
     periods.forEach(({ startH, endH, info }) => {
       const sA = decimalToAngle(startH);
-      const eA = decimalToAngle(endH); // endH=24 gives same angle as 0 (midnight)
+      const eA = decimalToAngle(endH); // endH=24 === decimalToAngle(0) — same angle
 
-      ctx.beginPath();
-      // Full-circle guard: decimalToAngle(0) === decimalToAngle(24), so ctx.arc
-      // from sA to eA with sA===eA draws nothing — use 2π instead.
-      if (startH === 0 && endH === 24) {
-        ctx.arc(C, C, WX_R, 0, 2 * Math.PI);
-      } else {
-        ctx.arc(C, C, WX_R, sA, eA, false);
-      }
-      ctx.strokeStyle = info.color;
-      ctx.lineWidth   = WX_W;
-      ctx.lineCap     = 'butt';
-      ctx.stroke();
+      // Draw each layer as a sub-band, stacked inner → outer
+      let offset = 0;
+      info.layers.forEach(([color, fraction]) => {
+        const thickness = fraction * WX_W;
+        const layerR    = ringInner + offset + thickness / 2;
+        offset += thickness;
 
-      // Emoji floats outside the ring at the arc midpoint — always shown
+        ctx.beginPath();
+        if (isFullCircle(startH, endH)) {
+          ctx.arc(C, C, layerR, 0, 2 * Math.PI);
+        } else {
+          ctx.arc(C, C, layerR, sA, eA, false);
+        }
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = thickness;
+        ctx.lineCap     = 'butt';
+        ctx.stroke();
+      });
+
+      // Emoji floats outside the full ring at the arc midpoint
       const midA = decimalToAngle((startH + endH) / 2);
       ctx.font         = '16px sans-serif';
       ctx.textAlign    = 'center';
