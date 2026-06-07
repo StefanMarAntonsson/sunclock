@@ -56,6 +56,7 @@
   </button>
 
   {#if open}
+    <div class="backdrop" role="presentation" onclick={() => (open = false)}></div>
     <div class="panel" onkeydown={onKeydown}>
       <div class="slots">
         <div class="slot">
@@ -101,6 +102,12 @@
     height: 13px;
     opacity: 0.45;
     flex-shrink: 0;
+  }
+
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99;
   }
 
   .panel {
