@@ -1,48 +1,48 @@
 <script lang="ts">
+  import WheelPicker from './WheelPicker.svelte';
+
   let {
     startTime = $bindable('08:00'),
-    endTime = $bindable('16:00'),
+    endTime   = $bindable('16:00'),
   }: {
     startTime?: string;
     endTime?: string;
   } = $props();
 
+  // Hours 00-23, minutes in 5-min steps 00-55
+  const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const MINS  = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
   let open = $state(false);
+  let shi  = $state(8);   // start hour index  (0-23)
+  let smi  = $state(0);   // start minute index (0-11 → :00-:55)
+  let ehi  = $state(16);  // end hour index
+  let emi  = $state(0);   // end minute index
 
-  // Draft values while the panel is open
-  let sh = $state(8), sm = $state(0);
-  let eh = $state(16), em = $state(0);
-
-  function parseHM(t: string): [number, number] {
+  function parseToIdx(t: string): [number, number] {
     const [h, m] = (t || '00:00').split(':').map(Number);
-    return [isNaN(h) ? 0 : h, isNaN(m) ? 0 : m];
-  }
-
-  function fmt(h: number, m: number) {
-    return (
-      String(Math.max(0, Math.min(23, h || 0))).padStart(2, '0') +
-      ':' +
-      String(Math.max(0, Math.min(59, m || 0))).padStart(2, '0')
-    );
+    const hour   = isNaN(h) ? 0 : Math.max(0, Math.min(23, h));
+    const minIdx = Math.min(11, Math.round((isNaN(m) ? 0 : m) / 5));
+    return [hour, minIdx];
   }
 
   function toggle() {
     if (!open) {
-      [sh, sm] = parseHM(startTime);
-      [eh, em] = parseHM(endTime);
+      [shi, smi] = parseToIdx(startTime);
+      [ehi, emi] = parseToIdx(endTime);
     }
     open = !open;
   }
 
   function commit() {
-    startTime = fmt(sh, sm);
-    endTime = fmt(eh, em);
+    startTime = `${HOURS[shi]}:${MINS[smi]}`;
+    endTime   = `${HOURS[ehi]}:${MINS[emi]}`;
     open = false;
   }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') open = false;
-    if (e.key === 'Enter') commit();
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
   }
 </script>
 
@@ -61,9 +61,9 @@
         <div class="slot">
           <span class="slot-label">start</span>
           <div class="hm">
-            <input type="number" min="0" max="23" bind:value={sh} />
+            <WheelPicker items={HOURS} bind:selectedIndex={shi} />
             <span class="colon">:</span>
-            <input type="number" min="0" max="59" bind:value={sm} />
+            <WheelPicker items={MINS}  bind:selectedIndex={smi} />
           </div>
         </div>
 
@@ -72,9 +72,9 @@
         <div class="slot">
           <span class="slot-label">end</span>
           <div class="hm">
-            <input type="number" min="0" max="23" bind:value={eh} />
+            <WheelPicker items={HOURS} bind:selectedIndex={ehi} />
             <span class="colon">:</span>
-            <input type="number" min="0" max="59" bind:value={em} />
+            <WheelPicker items={MINS}  bind:selectedIndex={emi} />
           </div>
         </div>
       </div>
@@ -90,7 +90,6 @@
     flex-shrink: 0;
   }
 
-  /* Trigger inherits the global button styles; just add the icon layout */
   .trigger {
     display: flex;
     align-items: center;
@@ -104,7 +103,6 @@
     flex-shrink: 0;
   }
 
-  /* Panel floats above the trigger */
   .panel {
     position: absolute;
     bottom: calc(100% + 6px);
@@ -118,8 +116,8 @@
     flex-direction: column;
     gap: 12px;
     z-index: 100;
-    min-width: 240px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    min-width: 260px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   }
 
   .slots {
@@ -131,7 +129,7 @@
   .slot {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
   }
 
   .slot-label {
@@ -145,49 +143,22 @@
   .hm {
     display: flex;
     align-items: center;
-    gap: 3px;
-  }
-
-  /* Number inputs — styled like the app's text inputs */
-  .hm input[type='number'] {
-    width: 42px;
-    text-align: center;
-    background: #0f1117;
-    border: 1px solid #2d3748;
-    color: #cbd5e1;
-    font-family: 'Courier New', monospace;
-    font-size: 1rem;
-    padding: 5px 0;
-    border-radius: 4px;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .hm input[type='number']:focus {
-    border-color: #475569;
-  }
-
-  /* Hide native spin buttons */
-  .hm input[type='number']::-webkit-outer-spin-button,
-  .hm input[type='number']::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-  .hm input[type='number'] {
-    -moz-appearance: textfield;
+    gap: 4px;
   }
 
   .colon {
     color: #475569;
     font-family: 'Courier New', monospace;
     font-size: 1rem;
+    margin-bottom: 1px;
   }
 
   .arrow {
     color: #374151;
     font-family: 'Courier New', monospace;
     font-size: 0.85rem;
-    margin-bottom: 8px;
+    padding-bottom: 2px;
+    flex-shrink: 0;
   }
 
   .set-btn {
