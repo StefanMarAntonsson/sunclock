@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { clockSettings, defaultSettings } from '../stores';
+  import { get } from 'svelte/store';
+  import {
+    clockSettings, defaultSettings,
+    customPalettes, PRESET_PALETTES, paletteToSettings,
+  } from '../stores';
+  import type { Palette } from '../stores';
 
   let open = $state(false);
 
@@ -11,16 +16,65 @@
 
   // Sections collapsed state
   let collapsed = $state<Record<string, boolean>>({
-    font: false,
-    face: false,
-    rings: false,
-    numbers: false,
-    daynight: false,
-    weather: false,
+    palette: false,
+    font: true,
+    face: true,
+    rings: true,
+    numbers: true,
+    daynight: true,
+    weather: true,
   });
 
   function toggle(section: string) {
     collapsed[section] = !collapsed[section];
+  }
+
+  // Palette management
+  let activePaletteId = $state<string | null>('default');
+  let savingName = $state('');
+  let showSaveInput = $state(false);
+
+  function applyPalette(p: Palette) {
+    clockSettings.update(cfg => ({ ...cfg, ...paletteToSettings(p) }));
+    activePaletteId = p.id;
+  }
+
+  function saveCustomPalette() {
+    const name = savingName.trim();
+    if (!name) return;
+    const cfg = get(clockSettings);
+    const newPalette: Palette = {
+      id: `custom_${Date.now()}`,
+      name,
+      faceColor: cfg.faceColor,
+      hourColor: cfg.hourColor,
+      hourTrackOpacity: cfg.hourTrackOpacity,
+      hourHandColor: cfg.hourHandColor,
+      minuteColor: cfg.minuteColor,
+      minuteTrackOpacity: cfg.minuteTrackOpacity,
+      minuteHandColor: cfg.minuteHandColor,
+      secondColor: cfg.secondColor,
+      secondTrackOpacity: cfg.secondTrackOpacity,
+      secondHandColor: cfg.secondHandColor,
+      numberColor: cfg.numberColor,
+      numberOpacity: cfg.numberOpacity,
+      currentNumberColor: cfg.currentNumberColor,
+      dayColor: cfg.dayColor,
+      dayOpacity: cfg.dayOpacity,
+      nightColor: cfg.nightColor,
+      nightOpacity: cfg.nightOpacity,
+      sunriseColor: cfg.sunriseColor,
+      sunsetColor: cfg.sunsetColor,
+    };
+    customPalettes.update(ps => [...ps, newPalette]);
+    activePaletteId = newPalette.id;
+    savingName = '';
+    showSaveInput = false;
+  }
+
+  function deleteCustomPalette(id: string) {
+    customPalettes.update(ps => ps.filter(p => p.id !== id));
+    if (activePaletteId === id) activePaletteId = null;
   }
 </script>
 
@@ -33,6 +87,76 @@
     </div>
 
     <div class="panel-body">
+
+      <!-- PALETTES -->
+      <div class="section">
+        <button class="section-head" onclick={() => toggle('palette')}>
+          <span>Color Palette</span><span class="caret">{collapsed.palette ? '▸' : '▾'}</span>
+        </button>
+        {#if !collapsed.palette}
+          <div class="section-body">
+            <p class="sub-head">Presets</p>
+            <div class="palette-grid">
+              {#each PRESET_PALETTES as p}
+                <button
+                  class="palette-card"
+                  class:active={activePaletteId === p.id}
+                  onclick={() => applyPalette(p)}
+                  title={p.name}
+                >
+                  <div class="palette-preview" style="background:{p.faceColor}">
+                    <span class="pdot" style="background:{p.hourHandColor}"></span>
+                    <span class="pdot" style="background:{p.minuteHandColor}"></span>
+                    <span class="pdot" style="background:{p.secondHandColor}"></span>
+                  </div>
+                  <span class="palette-label">{p.name}</span>
+                </button>
+              {/each}
+            </div>
+
+            {#if $customPalettes.length > 0}
+              <p class="sub-head">Custom</p>
+              <div class="palette-grid">
+                {#each $customPalettes as p}
+                  <div class="palette-card-wrap">
+                    <button
+                      class="palette-card"
+                      class:active={activePaletteId === p.id}
+                      onclick={() => applyPalette(p)}
+                      title={p.name}
+                    >
+                      <div class="palette-preview" style="background:{p.faceColor}">
+                        <span class="pdot" style="background:{p.hourHandColor}"></span>
+                        <span class="pdot" style="background:{p.minuteHandColor}"></span>
+                        <span class="pdot" style="background:{p.secondHandColor}"></span>
+                      </div>
+                      <span class="palette-label">{p.name}</span>
+                    </button>
+                    <button class="del-palette" onclick={() => deleteCustomPalette(p.id)} title="Delete">×</button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+
+            {#if showSaveInput}
+              <div class="save-row">
+                <input
+                  class="save-input"
+                  type="text"
+                  placeholder="Palette name…"
+                  bind:value={savingName}
+                  onkeydown={e => { if (e.key === 'Enter') saveCustomPalette(); if (e.key === 'Escape') { showSaveInput = false; savingName = ''; } }}
+                  autofocus
+                />
+                <button class="save-confirm" onclick={saveCustomPalette}>Save</button>
+                <button class="save-cancel" onclick={() => { showSaveInput = false; savingName = ''; }}>✕</button>
+              </div>
+            {:else}
+              <button class="add-palette-btn" onclick={() => { showSaveInput = true; }}>+ Save current as palette</button>
+            {/if}
+          </div>
+        {/if}
+      </div>
 
       <!-- FONT -->
       <div class="section">
@@ -400,6 +524,136 @@
     cursor: pointer;
     width: 140px;
   }
+
+  /* Palette grid */
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .palette-card-wrap {
+    position: relative;
+  }
+
+  .palette-card {
+    width: 100%;
+    background: none;
+    border: 1px solid #1e2a3a;
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    transition: border-color 0.15s;
+  }
+  .palette-card:hover { border-color: #3b82f6; }
+  .palette-card.active { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
+
+  .palette-preview {
+    width: 100%;
+    height: 32px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .pdot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .palette-label {
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    color: #64748b;
+    letter-spacing: 1px;
+  }
+
+  .del-palette {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #1e2a3a;
+    border: 1px solid #334155;
+    color: #64748b;
+    font-size: 0.65rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .del-palette:hover { background: #7f1d1d; color: #fca5a5; border-color: #7f1d1d; }
+
+  .add-palette-btn {
+    width: 100%;
+    background: none;
+    border: 1px dashed #1e2a3a;
+    border-radius: 6px;
+    color: #475569;
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 1px;
+    padding: 7px;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .add-palette-btn:hover { border-color: #3b82f6; color: #94a3b8; }
+
+  .save-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  .save-input {
+    flex: 1;
+    background: #181e2e;
+    border: 1px solid #1e2a3a;
+    border-radius: 4px;
+    color: #94a3b8;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    padding: 4px 8px;
+  }
+  .save-input:focus { outline: none; border-color: #3b82f6; }
+
+  .save-confirm {
+    background: #1e3a5f;
+    border: 1px solid #2563eb;
+    border-radius: 4px;
+    color: #93c5fd;
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+  .save-confirm:hover { background: #2563eb; }
+
+  .save-cancel {
+    background: none;
+    border: 1px solid #1e2a3a;
+    border-radius: 4px;
+    color: #475569;
+    font-size: 0.75rem;
+    padding: 4px 7px;
+    cursor: pointer;
+  }
+  .save-cancel:hover { color: #f87171; border-color: #7f1d1d; }
 
   /* Tab button — sticks out to the right of the panel */
   .tab {
