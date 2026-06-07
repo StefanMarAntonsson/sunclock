@@ -11,8 +11,9 @@
   const RIM_W = 16;
   const CUS_R = R - 35;     // 267  custom ranges band centre
   const CUS_W = 12;
-  const WX_R  = R + 24;     // 326  weather ring centre (outside clock face)
-  const WX_W  = 28;
+  const WX_R      = R + 24;           // 326  weather ring centre (outside clock face)
+  const WX_W      = 12;               // thinner ring
+  const WX_EMOJI_R = WX_R + WX_W / 2 + 16; // 348  emoji float outside ring edge
 
   let canvas: HTMLCanvasElement = $state() as HTMLCanvasElement;
 
@@ -64,14 +65,12 @@
       ctx.lineCap     = 'butt';
       ctx.stroke();
 
-      // Emoji at midpoint — only if group spans ≥2 hours (enough arc to fit text)
-      if (endH - startH >= 2) {
-        const midA = decimalToAngle((startH + endH) / 2);
-        ctx.font         = '15px sans-serif';
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(info.emoji, C + WX_R * Math.cos(midA), C + WX_R * Math.sin(midA));
-      }
+      // Emoji floats outside the ring at the arc midpoint — always shown
+      const midA = decimalToAngle((startH + endH) / 2);
+      ctx.font         = '16px sans-serif';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(info.emoji, C + WX_EMOJI_R * Math.cos(midA), C + WX_EMOJI_R * Math.sin(midA));
     });
   }
 
