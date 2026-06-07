@@ -29,7 +29,7 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    max-height: 94px; /* ~3 items (28px each) + 2 gaps (5px each) */
+    max-height: 61px; /* 2 items (28px each) + 1 gap (5px) */
     overflow-y: auto;
     padding-right: 16px; /* keeps × clear of scrollbar */
   }
